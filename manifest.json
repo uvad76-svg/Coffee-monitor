@@ -1,8 +1,9 @@
 {
   "name": "Coffee Market Monitor",
   "short_name": "Coffee Monitor",
-  "description": "Live цены на кофе: Арабика, Робуста, BRL, нецть, погода Бразилии",
-  "start_url": "/index.html",
+  "description": "Live цены на кофе: Арабика, Робуста, BRL, погода Бразилии",
+  "start_url": "/Coffee-monitor/",
+  "scope": "/Coffee-monitor/",
   "display": "standalone",
   "background_color": "#0d0b08",
   "theme_color": "#0d0b08",
