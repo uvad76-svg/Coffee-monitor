@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coffee Market Monitor — Live</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coffee Monitor">
+<meta name="theme-color" content="#0d0b08">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b08;
+    --surface: #151210;
+    --surface2: #1c1814;
+    --border: #2a2420;
+    --accent: #c8832a;
+    --accent2: #e8a84c;
+    --green: #4caf7d;
+    --red: #e05c5c;
+    --yellow: #d4b44a;
+    --text: #e8ddd0;
+    --text-dim: #7a6e64;
+    --text-mid: #b0a090;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--accent2);
+    line-height: 1;
+  }
+  .header-left p {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+  .header-right { text-align: right; }
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--green);
+    background: rgba(76,175,125,0.1);
+    border: 1px solid rgba(76,175,125,0.25);
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .last-updated { font-size: 0.58rem; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.08em; }
+
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .refresh-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* LOADING */
+  .loading-bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .loading-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  /* GRID */
+  .grid { display: grid; gap: 14px; }
+  .grid-prices { grid-template-columns: repeat(4, 1fr); }
+  .grid-mid { grid-template-columns: 2fr 1fr; margin-top: 14px; }
+  .grid-bot { grid-template-columns: 1fr 1fr 1fr; margin-top: 14px; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    animation: fadeIn 0.4s ease both;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.2s; }
+  .card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+  .card.bull::before { background: var(--green); }
+  .card.bear::before { background: var(--red); }
+  .card.neutral::before { background: var(--accent); }
+  .card.warn::before { background: var(--yellow); }
+  .card:hover { border-color: var(--accent); }
+
+  .card-label { font-size: 0.58rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+  .card-value { font-size: 1.9rem; font-weight: 500; line-height: 1; color: var(--text); }
+  .card-value.live { color: var(--accent2); }
+  .card-sub { font-size: 0.6rem; color: var(--text-dim); margin-top: 5px; }
+  .skeleton { background: var(--border); border-radius: 3px; animation: shimmer 1.5s infinite; }
+  @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
+  .skeleton-val { height: 32px; width: 120px; margin: 4px 0; }
+  .skeleton-sub { height: 12px; width: 80px; margin-top: 6px; }
+
+  .change {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 0.7rem; font-weight: 500;
+    padding: 2px 7px; border-radius: 3px; margin-top: 8px;
+  }
+  .change.up { color: var(--green); background: rgba(76,175,125,0.12); }
+  .change.down { color: var(--red); background: rgba(224,92,92,0.12); }
+  .change.flat { color: var(--yellow); background: rgba(212,180,74,0.12); }
+
+  /* PRICE RANGE */
+  .price-range { margin-top: 14px; }
+  .price-range-label { display: flex; justify-content: space-between; font-size: 0.55rem; color: var(--text-dim); margin-bottom: 5px; }
+  .range-bar { height: 4px; background: var(--border); border-radius: 2px; position: relative; }
+  .range-fill { position: absolute; height: 100%; background: linear-gradient(90deg, var(--red), var(--yellow), var(--green)); border-radius: 2px; width: 100%; }
+  .range-marker { position: absolute; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent2); border: 2px solid var(--bg); transform: translateX(-50%); transition: left 0.5s ease; }
+
+  /* WEATHER */
+  .weather-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .weather-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 10px; text-align: center; }
+  .weather-city { font-size: 0.55rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 5px; }
+  .weather-temp { font-size: 1.4rem; font-weight: 500; }
+  .weather-temp.cold { color: #6ab0e8; }
+  .weather-temp.warm { color: var(--yellow); }
+  .weather-temp.hot { color: var(--red); }
+  .weather-desc { font-size: 0.55rem; color: var(--text-dim); margin-top: 3px; }
+  .frost-alert { margin-top: 8px; padding: 8px 10px; background: rgba(100,160,232,0.08); border: 1px solid rgba(100,160,232,0.2); border-radius: 4px; font-size: 0.58rem; color: #6ab0e8; }
+
+  /* FACTORS */
+  .factors-list { margin-top: 10px; }
+  .factor-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.62rem; }
+  .factor-row:last-child { border-bottom: none; }
+  .factor-badge { flex-shrink: 0; padding: 2px 6px; border-radius: 3px; font-size: 0.52rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .badge-bull { background: rgba(76,175,125,0.15); color: var(--green); border: 1px solid rgba(76,175,125,0.3); }
+  .badge-bear { background: rgba(224,92,92,0.15); color: var(--red); border: 1px solid rgba(224,92,92,0.3); }
+  .badge-risk { background: rgba(212,180,74,0.15); color: var(--yellow); border: 1px solid rgba(212,180,74,0.3); }
+  .factor-desc { color: var(--text-mid); line-height: 1.5; flex: 1; }
+  .factor-desc strong { color: var(--text); }
+
+  /* SIGNALS */
+  .signals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .signal-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 9px 10px; display: flex; align-items: center; gap: 7px; }
+  .signal-text { font-size: 0.58rem; color: var(--text-mid); line-height: 1.4; }
+  .signal-text strong { display: block; color: var(--text); font-size: 0.62rem; margin-bottom: 1px; }
+
+  /* SOURCES */
+  .sources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+  .source-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 9px 11px; text-decoration: none; display: block; transition: all 0.2s; }
+  .source-item:hover { border-color: var(--accent); background: var(--surface); }
+  .source-name { font-size: 0.68rem; color: var(--accent2); font-weight: 500; }
+  .source-desc { font-size: 0.55rem; color: var(--text-dim); margin-top: 2px; line-height: 1.4; }
+  .source-freq { display: inline-block; font-size: 0.52rem; color: var(--text-dim); background: var(--border); padding: 1px 5px; border-radius: 2px; margin-top: 4px; }
+
+  /* CALENDAR */
+  .cal-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: center; }
+  .cal-item:last-child { border-bottom: none; }
+  .cal-month { flex-shrink: 0; width: 50px; font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 500; }
+  .cal-event { font-size: 0.6rem; color: var(--text-mid); line-height: 1.4; }
+  .cal-event strong { color: var(--text); }
+  .cal-now { border-left: 2px solid var(--accent); padding-left: 8px; }
+  .imp { flex-shrink: 0; margin-left: auto; display: flex; gap: 2px; }
+  .imp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); }
+  .imp-dot.on { background: var(--accent); }
+
+  /* CHECKLIST */
+  .check-item { display: flex; align-items: flex-start; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.6rem; cursor: pointer; }
+  .check-item:last-child { border-bottom: none; }
+  .check-box { flex-shrink: 0; width: 14px; height: 14px; border: 1px solid var(--border); border-radius: 2px; display: flex; align-items: center; justify-content: center; margin-top: 1px; transition: all 0.2s; }
+  .check-box.checked { background: var(--accent); border-color: var(--accent); }
+  .check-box.checked::after { content: '✓'; font-size: 9px; color: var(--bg); }
+  .check-text { color: var(--text-mid); line-height: 1.4; }
+  .check-text strong { color: var(--text); display: block; }
+
+  .section-title { font-size: 0.58rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .error-msg { font-size: 0.6rem; color: var(--red); background: rgba(224,92,92,0.08); border: 1px solid rgba(224,92,92,0.2); padding: 6px 10px; border-radius: 3px; margin-top: 6px; }
+  .api-note { font-size: 0.55rem; color: var(--text-dim); font-style: italic; margin-top: 4px; }
+
+
+
+
+  @media (max-width: 1100px) {
+    .grid-prices { grid-template-columns: repeat(2, 1fr); }
+    .grid-mid { grid-template-columns: 1fr; }
+    .grid-bot { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 680px) {
+    .grid-prices, .grid-bot { grid-template-columns: 1fr; }
+    body { padding: 14px; }
+    .header-left h1 { font-size: 1.7rem; }
+  }
+</style>
+</head>
+<body>
+
+
+
+<div class="header">
+  <div class="header-left">
+    <h1>☕ Coffee Monitor</h1>
+    <p>Живые данные · Арабика / Робуста / BRL · Погода Бразилии</p>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><span class="dot"></span> Live Data</div>
+    <div class="last-updated" id="updated-time">Загрузка...</div>
+    <button class="refresh-btn" onclick="loadAll()" id="refresh-btn">↻ Обновить данные</button>
+  </div>
+</div>
+
+<div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+
+<!-- PRICES -->
+<div class="section-title">Ключевые цены <span style="color:var(--green);font-size:0.52rem;">(live)</span></div>
+<div class="grid grid-prices">
+
+  <div class="card neutral" id="card-kc">
+    <div class="card-label">Арабика (KC) — ICE NY</div>
+    <div class="card-value live" id="kc-price"><div class="skeleton skeleton-val"></div></div>
+    <div class="card-sub" id="kc-sub"><div class="skeleton skeleton-sub"></div></div>
+    <div id="kc-change"></div>
+    <div class="price-range" id="kc-range" style="display:none">
+      <div class="price-range-label">
+        <span>Поддержка 275</span><span>Цена</span><span>Сопр. 319</span>
+      </div>
+      <div class="range-bar">
+        <div class="range-fill"></div>
+        <div class="range-marker" id="kc-marker" style="left:40%"></div>
+      </div>
+    </div>
+    <div class="api-note">Данные: Yahoo Finance (15 мин задержка)</div>
+  </div>
+
+    <div class="card neutral" id="card-rc">
+    <div class="card-label">Робуста (RC) — ICE London</div>
+    <div class="card-value live" id="rc-price"><div class="skeleton skeleton-val"></div></div>
+    <div class="card-sub" id="rc-sub"><div class="skeleton skeleton-sub"></div></div>
+    <div id="rc-change"></div>
+    <div class="api-note">Данные: Investing.com · ICE London · USD/т</div>
+  </div>
+
+  <div class="card neutral" id="card-brl">
+    <div class="card-label">BRL/USD — Курс реала</div>
+    <div class="card-value live" id="brl-price"><div class="skeleton skeleton-val"></div></div>
+    <div class="card-sub" id="brl-sub"><div class="skeleton skeleton-sub"></div></div>
+    <div id="brl-change"></div>
+    <div id="brl-signal" style="margin-top:8px;"></div>
+    <div class="api-note">Данные: Frankfurter API (реальное время)</div>
+  </div>
+
+  <div class="card neutral" id="card-oil">
+    <div class="card-label">Нефть Brent — фрахт/логистика</div>
+    <div class="card-value live" id="oil-price"><div class="skeleton skeleton-val"></div></div>
+    <div class="card-sub" id="oil-sub"><div class="skeleton skeleton-sub"></div></div>
+    <div id="oil-change"></div>
+    <div id="oil-signal" style="margin-top:8px;"></div>
+    <div class="api-note">Данные: Yahoo Finance (15 мин задержка)</div>
+  </div>
+
+</div>
+
+<!-- MID ROW -->
+<div class="grid grid-mid">
+
+  <!-- LEFT: ФАКТОРЫ + ПОГОДА -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <!-- ПОГОДА -->
+    <div class="card warn">
+      <div class="card-label">🌦 Погода в кофейных регионах Бразилии <span style="color:var(--green);font-size:0.52rem;">(live)</span></div>
+      <div class="weather-grid" id="weather-grid">
+        <div class="weather-item"><div class="weather-city">Загрузка...</div><div class="skeleton" style="height:28px;width:50px;margin:4px auto;border-radius:3px;"></div></div>
+        <div class="weather-item"><div class="weather-city">Загрузка...</div><div class="skeleton" style="height:28px;width:50px;margin:4px auto;border-radius:3px;"></div></div>
+        <div class="weather-item"><div class="weather-city">Загрузка...</div><div class="skeleton" style="height:28px;width:50px;margin:4px auto;border-radius:3px;"></div></div>
+      </div>
+      <div id="frost-alert-box"></div>
+      <div class="api-note" style="margin-top:8px;">Данные: Open-Meteo API (реальное время) · Регионы: Минас-Жерайс, Серрадо, Рондония</div>
+    </div>
+
+    <!-- ФАКТОРЫ -->
+    <div class="card neutral">
+      <div class="card-label">Активные факторы рынка</div>
+      <div class="factors-list">
+        <div class="factor-row">
+          <span class="factor-badge badge-bull">Бычий</span>
+          <span class="factor-desc"><strong>Ормуз закрыт</strong> — с 28 фев. Maersk, CMA CGM приостановили транзит. Обход мыса Доброй Надежды: +10–20 дней маршрута.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-bull">Бычий</span>
+          <span class="factor-desc"><strong>Экспорт Бразилии −17.4%</strong> г/г в феврале. Фермеры придерживают зерно + логистика.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-bull">Бычий</span>
+          <span class="factor-desc"><strong>Колумбия −34%</strong> производства в январе г/г. Урожай 2025/26 лишь ~12.5 млн мешков.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-bear">Медв.</span>
+          <span class="factor-desc"><strong>Рекордный урожай Бразилии</strong> — CONAB: 66.2 млн мешков 2026 (+17.1% г/г). Arabica: 44.1 млн.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-bear">Медв.</span>
+          <span class="factor-desc"><strong>Глобальный профицит</strong> 8–10 млн мешков в 2026/27. Rabobank: мировое пр-во ~180 млн мешков.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-bear">Медв.</span>
+          <span class="factor-desc"><strong>Вьетнам</strong> — 6.1 млн мешков экспорта за янв–фев 2026. Активно забирает рыночную долю.</span>
+        </div>
+        <div class="factor-row">
+          <span class="factor-badge badge-risk">Риск ⚠</span>
+          <span class="factor-desc"><strong>Заморозки в Бразилии</strong> — период риска: июнь–август 2026. Мониторинг Somar ежедневно.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: СИГНАЛЫ + COT -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card neutral">
+      <div class="card-label">Торговые уровни (Jul-26)</div>
+      <div class="signals-grid">
+        <div class="signal-item"><span>📍</span><div class="signal-text"><strong>Поддержка</strong>275–280 ц/фунт</div></div>
+        <div class="signal-item"><span>🎯</span><div class="signal-text"><strong>Сопротивление</strong>308 и 319 ц/фунт</div></div>
+        <div class="signal-item"><span>🟢</span><div class="signal-text"><strong>Покупать</strong>у 275–280 (осторожно)</div></div>
+        <div class="signal-item"><span>🔴</span><div class="signal-text"><strong>Фиксировать</strong>у 308–315 ц/фунт</div></div>
+        <div class="signal-item"><span>⛔</span><div class="signal-text"><strong>Стоп-лосс</strong>пробой ниже 265</div></div>
+        <div class="signal-item"><span>📈</span><div class="signal-text"><strong>Ormuz-сценарий</strong>докупать выше 320</div></div>
+      </div>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);">
+        <div style="font-size:0.55rem;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;">Прогноз Rabobank (конец 2026)</div>
+        <div style="font-size:1.2rem;color:var(--accent2);font-weight:500;">$2.50 – $3.00 / фунт</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:3px;">World Bank: −13% к текущим уровням</div>
+      </div>
+    </div>
+
+    <div class="card neutral">
+      <div class="card-label">Запасы ICE (последние данные)</div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:0.55rem;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">Arabica Certified Stocks</div>
+        <div style="font-size:1.5rem;color:var(--red);font-weight:500;">443,983</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">мешков · −50% г/г · Исторически низко</div>
+      </div>
+      <div style="font-size:0.55rem;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">Robusta Stocks (London)</div>
+      <div style="font-size:1.2rem;color:var(--yellow);font-weight:500;">188,548 т</div>
+      <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">−15,312 т за месяц</div>
+      <div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);">
+        <div style="font-size:0.58rem;color:var(--text-mid);">📋 <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/" target="_blank" style="color:var(--accent2);text-decoration:none;">COT Report</a> — проверять каждую пятницу<br>Non-Commercial Net Long/Short по кофе</div>
+      </div>
+    </div>
+
+    <!-- ЧЕКЛИСТ -->
+    <div class="card neutral">
+      <div class="card-label">Еженедельный чеклист</div>
+      <div id="checklist">
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>📊 Цены ICE Arabica / Robusta</strong>Уровни, объёмы, сертифицированные запасы</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>📋 COT Report (каждую пятницу)</strong>CFTC: Non-Commercial Long/Short</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>💱 Курс BRL/USD</strong>Слабый реал = давление вниз на цену</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>🌦 Погода Бразилии (Somar)</strong>Заморозки в июн–авг: критично</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>🚢 Ормуз / Красное море</strong>Freightos, страховые ставки, новости</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>📰 Sucafina Weekly Report</strong>Еженедельный аналитический разбор</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text"><strong>📦 Экспорт Бразилии (Cecafé)</strong>Начало месяца — сравнить с прогнозом</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);">
+        <span style="font-size:0.58rem;color:var(--text-dim);letter-spacing:0.08em;text-transform:uppercase;">Выполнено</span>
+        <span style="font-size:0.9rem;color:var(--accent2);" id="check-count">0 / 7</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- BOT ROW -->
+<div class="grid grid-bot">
+
+  <!-- ИСТОЧНИКИ -->
+  <div class="card neutral">
+    <div class="card-label">Ключевые источники</div>
+    <div class="sources-grid">
+      <a href="https://sucafina.com/na/lp/market-report" target="_blank" class="source-item">
+        <div class="source-name">Sucafina Report</div>
+        <div class="source-desc">Лучший разбор от трейдеров</div>
+        <span class="source-freq">еженедельно</span>
+      </a>
+      <a href="https://www.comunicaffe.com" target="_blank" class="source-item">
+        <div class="source-name">Comunicaffe</div>
+        <div class="source-desc">Новости, геополитика, логистика</div>
+        <span class="source-freq">ежедневно</span>
+      </a>
+      <a href="https://www.barchart.com/futures/quotes/kc*0" target="_blank" class="source-item">
+        <div class="source-name">Barchart Coffee</div>
+        <div class="source-desc">Цены, COT, технический анализ</div>
+        <span class="source-freq">ежедневно</span>
+      </a>
+      <a href="https://www.conab.gov.br" target="_blank" class="source-item">
+        <div class="source-name">CONAB</div>
+        <div class="source-desc">Официальный прогноз урожая BR</div>
+        <span class="source-freq">4–5 раз/год</span>
+      </a>
+      <a href="https://www.cecafe.com.br" target="_blank" class="source-item">
+        <div class="source-name">Cecafé</div>
+        <div class="source-desc">Экспорт кофе из Бразилии</div>
+        <span class="source-freq">ежемесячно</span>
+      </a>
+      <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/" target="_blank" class="source-item">
+        <div class="source-name">CFTC COT</div>
+        <div class="source-desc">Позиции фондов по фьючерсам</div>
+        <span class="source-freq">пятница</span>
+      </a>
+      <a href="https://www.somar.com.br" target="_blank" class="source-item">
+        <div class="source-name">Somar Meteo</div>
+        <div class="source-desc">Погода Бразилии для трейдеров</div>
+        <span class="source-freq">ежедневно</span>
+      </a>
+      <a href="https://apps.fas.usda.gov/psdonline/app/index.html" target="_blank" class="source-item">
+        <div class="source-name">USDA WASDE</div>
+        <div class="source-desc">Мировой баланс спроса/предложения</div>
+        <span class="source-freq">ежемесячно</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- КАЛЕНДАРЬ -->
+  <div class="card neutral">
+    <div class="card-label">Календарь событий 2026</div>
+    <div id="calendar-list">
+      <div class="cal-item" id="cal-mar"><div class="cal-month">МАР–АПР</div><div class="cal-event"><strong>Данные экспорта Cecafé</strong> Ожидается 2.7–3.5 млн мешков (пересмотр с 4M+)</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot"></div></div></div>
+      <div class="cal-item" id="cal-apr"><div class="cal-month">АПР–МАЙ</div><div class="cal-event"><strong>Начало уборки в Бразилии</strong> Первые реальные данные объёма урожая 2026/27</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot on"></div></div></div>
+      <div class="cal-item" id="cal-may"><div class="cal-month">МАЙ</div><div class="cal-event"><strong>CONAB Crop Report</strong> Первый официальный прогноз урожая 2026/27 — двигает рынок</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot on"></div></div></div>
+      <div class="cal-item" id="cal-jun"><div class="cal-month">ИЮН–АВГ</div><div class="cal-event"><strong>⚠️ Период заморозков в Бразилии</strong> Наибольший риск года. Мониторинг Somar ежедневно.</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot on"></div></div></div>
+      <div class="cal-item"><div class="cal-month">СЕН–ДЕК</div><div class="cal-event"><strong>Цветение в Бразилии</strong> Осадки критичны — определяет урожай 2027/28</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot on"></div></div></div>
+      <div class="cal-item"><div class="cal-month">ДЕК 2026</div><div class="cal-event"><strong>Возврат к контанго</strong> Rabobank: когда объёмы нового урожая поступят на рынок</div><div class="imp"><div class="imp-dot on"></div><div class="imp-dot on"></div><div class="imp-dot"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ОБЩИЙ ПРОГНОЗ -->
+  <div class="card neutral">
+    <div class="card-label">Общий прогноз на 2026</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:4px;border:1px solid rgba(224,92,92,0.3);">
+        <div style="font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--red);margin-bottom:4px;">Среднесрочный (−13%)</div>
+        <div style="font-size:1.1rem;color:var(--text);">$2.50–3.00 / фунт</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">Rabobank / World Bank прогноз</div>
+      </div>
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:4px;border:1px solid rgba(212,180,74,0.3);">
+        <div style="font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--yellow);margin-bottom:4px;">Краткосрочный (геополитика)</div>
+        <div style="font-size:1.1rem;color:var(--text);">308–328 / фунт</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">При эскалации Ормуза</div>
+      </div>
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:4px;border:1px solid rgba(76,175,125,0.3);">
+        <div style="font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--green);margin-bottom:4px;">Риск-сценарий (заморозки)</div>
+        <div style="font-size:1.1rem;color:var(--text);">315–340+ / фунт</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">Июн–авг: мгновенный разворот</div>
+      </div>
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);">
+        <div style="font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">Долгосрочный 2027</div>
+        <div style="font-size:1.1rem;color:var(--text);">$2.50–2.80 / фунт</div>
+        <div style="font-size:0.58rem;color:var(--text-dim);margin-top:2px;">Выше ист. нормы 2020–2023</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+  <div style="font-size:0.52rem;color:var(--text-dim);">⚠ Только для информационных целей. Не является финансовой рекомендацией. Рыночные данные с задержкой.</div>
+  <div style="font-size:0.52rem;color:var(--text-dim);">Coffee Market Monitor · Live Edition · <span id="footer-date"></span></div>
+</div>
+
+<script>
+
+
+
+// ── UTILS ──────────────────────────────────────────────────────────────
+function setProgress(pct) {
+  document.getElementById('loading-fill').style.width = pct + '%';
+}
+
+function formatChange(val, suffix='') {
+  if (val === null || val === undefined || isNaN(val)) return '';
+  const sign = val >= 0 ? '▲ +' : '▼ ';
+  const cls = val >= 0 ? 'up' : 'down';
+  return `<div class="change ${cls}">${sign}${Math.abs(val).toFixed(2)}${suffix}</div>`;
+}
+
+function now() {
+  return new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// ── YAHOO FINANCE via multiple proxies ────────────────────────────────
+async function fetchYahoo(symbol) {
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
+  const yahooUrl2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
+
+  const proxies = [
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+  ];
+
+  const parseYahoo = (raw) => {
+    let data;
+    if (typeof raw === 'string') data = JSON.parse(raw);
+    else if (raw.contents) data = JSON.parse(raw.contents);
+    else data = raw;
+    const meta = data.chart.result[0].meta;
+    const price = meta.regularMarketPrice;
+    const prev = meta.previousClose || meta.chartPreviousClose;
+    const change = price - prev;
+    const changePct = (change / prev) * 100;
+    return { price, change, changePct, currency: meta.currency };
+  };
+
+  for (const baseUrl of [yahooUrl, yahooUrl2]) {
+    for (const proxyFn of proxies) {
+      try {
+        const r = await fetch(proxyFn(baseUrl), {signal: AbortSignal.timeout(8000)});
+        if (!r.ok) continue;
+        const j = await r.json();
+        return parseYahoo(j);
+      } catch(e) { /* try next */ }
+    }
+  }
+  throw new Error('All proxies failed for ' + symbol);
+}
+
+// ── ROBUSTA — специальная функция с рабочими символами ───────────────
+async function fetchRobusta() {
+  // Investing.com API — работает без CORS-ограничений
+  // ID 8911 = London Robusta Coffee Futures (ICE)
+  // Данные в USD/тонну, формат свечи: [timestamp, open, high, low, close, volume]
+  const url = 'https://api.investing.com/api/financialdata/8911/historical/chart/?period=P1D&interval=PT5M&pointscount=60';
+  const r = await fetch(url, {
+    headers: { 'X-requested-with': 'XMLHttpRequest', 'domain-id': 'www' },
+    signal: AbortSignal.timeout(8000)
+  });
+  const j = await r.json();
+  const data = j.data;
+  if (!data || data.length === 0) throw new Error('no data from Investing.com');
+  
+  // Последняя свеча: [timestamp, open, high, low, close, volume]
+  const last = data[data.length - 1];
+  const prev = data[data.length - 2];
+  const price = last[4];   // close
+  const prevPrice = prev ? prev[4] : price;
+  const changePct = prevPrice ? ((price - prevPrice) / prevPrice) * 100 : 0;
+  
+  return {
+    price,
+    priceKg: price / 1000,
+    change: price - prevPrice,
+    changePct,
+    source: 'Investing.com'
+  };
+}
+
+// ── BRL/USD via Frankfurter ────────────────────────────────────────────
+async function fetchBRL() {
+  const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=BRL', {signal: AbortSignal.timeout(8000)});
+  const j = await r.json();
+  const rate = j.rates.BRL;
+  // Yesterday
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = yesterday.toISOString().split('T')[0];
+  let changePct = null;
+  try {
+    const r2 = await fetch(`https://api.frankfurter.app/${yStr}?from=USD&to=BRL`, {signal: AbortSignal.timeout(6000)});
+    const j2 = await r2.json();
+    const prevRate = j2.rates.BRL;
+    changePct = ((rate - prevRate) / prevRate) * 100;
+  } catch(e) {}
+  return { rate, changePct };
+}
+
+// ── WEATHER via Open-Meteo ─────────────────────────────────────────────
+const weatherRegions = [
+  { name: 'Минас-Жерайс', lat: -19.9, lon: -43.9, key: 'mg' },
+  { name: 'Серрадо', lat: -18.7, lon: -46.5, key: 'ce' },
+  { name: 'Рондония', lat: -10.9, lon: -61.9, key: 'ro' },
+];
+
+async function fetchWeather() {
+  const coords = weatherRegions.map(r => `${r.lat},${r.lon}`).join('&latitude=').replace(',', '&longitude=');
+  // Build individual requests
+  const results = await Promise.all(weatherRegions.map(async (region) => {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${region.lat}&longitude=${region.lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_min,temperature_2m_max&timezone=America/Sao_Paulo&forecast_days=3`;
+    const r = await fetch(url, {signal: AbortSignal.timeout(8000)});
+    const j = await r.json();
+    return {
+      name: region.name,
+      temp: j.current.temperature_2m,
+      minTemp: j.daily.temperature_2m_min[0],
+      maxTemp: j.daily.temperature_2m_max[0],
+      code: j.current.weather_code,
+    };
+  }));
+  return results;
+}
+
+function weatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌦️';
+  if (code <= 99) return '⛈️';
+  return '🌡️';
+}
+
+function tempClass(t) {
+  if (t < 8) return 'cold';
+  if (t < 18) return 'warm';
+  return 'hot';
+}
+
+// ── RENDER FUNCTIONS ───────────────────────────────────────────────────
+function renderKC(data) {
+  const { price, change, changePct } = data;
+  document.getElementById('kc-price').textContent = price.toFixed(2) + ' ¢/lb';
+  document.getElementById('kc-sub').textContent = 'Арабика фьючерс · ICE New York';
+  document.getElementById('kc-change').innerHTML = formatChange(changePct, '%');
+  // Range marker: support=275, resistance=319
+  const pct = Math.min(100, Math.max(0, ((price - 275) / (319 - 275)) * 100));
+  document.getElementById('kc-range').style.display = 'block';
+  document.getElementById('kc-marker').style.left = pct + '%';
+  document.getElementById('card-kc').className = `card ${changePct >= 0 ? 'bull' : 'bear'}`;
+}
+
+function renderRC(data) {
+  const { price, priceKg, changePct, source } = data;
+  const kg = priceKg != null ? priceKg : price / 1000;
+  document.getElementById('rc-price').textContent = '$' + price.toFixed(0) + '/т  ·  $' + kg.toFixed(3) + '/кг';
+  document.getElementById('rc-sub').textContent = 'Робуста фьючерс · ICE London' + (source ? ' · ' + source : '');
+  document.getElementById('rc-change').innerHTML = formatChange(changePct, '%');
+  document.getElementById('card-rc').className = `card ${changePct >= 0 ? 'bull' : 'bear'}`;
+}
+
+function renderBRL(data) {
+  const { rate, changePct } = data;
+  document.getElementById('brl-price').textContent = rate.toFixed(4);
+  document.getElementById('brl-sub').textContent = 'BRL за 1 USD · Frankfurter API';
+  if (changePct !== null) document.getElementById('brl-change').innerHTML = formatChange(changePct, '%');
+  // Signal
+  const weak = rate > 5.7;
+  document.getElementById('brl-signal').innerHTML = weak
+    ? `<div style="font-size:0.6rem;color:var(--red);background:rgba(224,92,92,0.08);border:1px solid rgba(224,92,92,0.2);padding:4px 8px;border-radius:3px;">⚠ Слабый реал → фермеры продают → цена ↓</div>`
+    : `<div style="font-size:0.6rem;color:var(--green);background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);padding:4px 8px;border-radius:3px;">✓ Сильный реал → меньше давления на цену</div>`;
+  document.getElementById('card-brl').className = `card ${weak ? 'bear' : 'bull'}`;
+}
+
+function renderOil(data) {
+  const { price, changePct } = data;
+  document.getElementById('oil-price').textContent = '$' + price.toFixed(2);
+  document.getElementById('oil-sub').textContent = 'Brent Crude · USD/баррель';
+  document.getElementById('oil-change').innerHTML = formatChange(changePct, '%');
+  const high = price > 90;
+  document.getElementById('oil-signal').innerHTML = high
+    ? `<div style="font-size:0.6rem;color:var(--red);background:rgba(224,92,92,0.08);border:1px solid rgba(224,92,92,0.2);padding:4px 8px;border-radius:3px;">⚠ Высокая нефть → фрахт дорожает → поддержка цены кофе</div>`
+    : `<div style="font-size:0.6rem;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);padding:4px 8px;border-radius:3px;">Нормальный уровень. Логистика стабильна.</div>`;
+  document.getElementById('card-oil').className = `card ${high ? 'warn' : 'neutral'}`;
+}
+
+function renderWeather(regions) {
+  const container = document.getElementById('weather-grid');
+  let hasFrostRisk = false;
+
+  container.innerHTML = regions.map(r => {
+    const tc = tempClass(r.temp);
+    const isFrost = r.minTemp < 5;
+    if (isFrost) hasFrostRisk = true;
+    return `
+      <div class="weather-item" style="${isFrost ? 'border-color:rgba(100,160,232,0.4);' : ''}">
+        <div class="weather-city">${r.name}</div>
+        <div class="weather-temp ${tc}">${weatherIcon(r.code)} ${r.temp.toFixed(1)}°C</div>
+        <div class="weather-desc">↓${r.minTemp.toFixed(0)}° / ↑${r.maxTemp.toFixed(0)}°</div>
+        ${isFrost ? '<div style="font-size:0.52rem;color:#6ab0e8;margin-top:4px;">❄ РИСК ЗАМОРОЗКОВ</div>' : ''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('frost-alert-box').innerHTML = hasFrostRisk
+    ? `<div class="frost-alert">❄️ ВНИМАНИЕ: Риск заморозков в одном или нескольких регионах. Возможен резкий рост цен.</div>`
+    : (new Date().getMonth() >= 5 && new Date().getMonth() <= 7)
+      ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(212,180,74,0.08);border:1px solid rgba(212,180,74,0.2);border-radius:4px;font-size:0.58rem;color:var(--yellow);">⚠ Активный период риска заморозков. Мониторинг ежедневно.</div>`
+      : '';
+}
+
+function renderError(id, msg) {
+  document.getElementById(id).innerHTML = `<div class="error-msg">Ошибка загрузки: ${msg}</div>`;
+}
+
+// ── HIGHLIGHT CURRENT CALENDAR PERIOD ─────────────────────────────────
+function highlightCalendar() {
+  const m = new Date().getMonth(); // 0-based
+  if (m <= 3) document.getElementById('cal-mar')?.classList.add('cal-now');
+  else if (m <= 4) document.getElementById('cal-apr')?.classList.add('cal-now');
+  else if (m === 4) document.getElementById('cal-may')?.classList.add('cal-now');
+  else if (m >= 5 && m <= 7) document.getElementById('cal-jun')?.classList.add('cal-now');
+}
+
+// ── CHECKLIST ──────────────────────────────────────────────────────────
+function toggleCheck(item) {
+  item.querySelector('.check-box').classList.toggle('checked');
+  updateCheckCount();
+}
+function updateCheckCount() {
+  const total = document.querySelectorAll('.check-item').length;
+  const done = document.querySelectorAll('.check-box.checked').length;
+  const el = document.getElementById('check-count');
+  el.textContent = `${done} / ${total}`;
+  el.style.color = done === total ? 'var(--green)' : 'var(--accent2)';
+}
+
+// ── MAIN LOAD ──────────────────────────────────────────────────────────
+async function loadAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Загружаю...';
+  setProgress(5);
+
+  document.getElementById('updated-time').textContent = 'Загружаю данные...';
+
+  const errors = [];
+
+  // 1. BRL (fastest, direct API)
+  try {
+    const brl = await fetchBRL();
+    renderBRL(brl);
+  } catch(e) {
+    renderError('brl-price', 'BRL API недоступен');
+    errors.push('BRL');
+  }
+  setProgress(30);
+
+  // 2. KC Arabica
+  try {
+    const kc = await fetchYahoo('KC=F');
+    renderKC(kc);
+  } catch(e) {
+    // try alternative symbol
+    try {
+      const kc2 = await fetchYahoo('KCK26.NYB');
+      renderKC(kc2);
+    } catch(e2) {
+      document.getElementById('kc-price').textContent = '—';
+      document.getElementById('kc-sub').textContent = 'Нет данных (откройте Barchart)';
+      document.getElementById('kc-range').style.display = 'none';
+      errors.push('KC');
+    }
+  }
+  setProgress(50);
+
+  // 3. Robusta — Investing.com API
+  try {
+    const rc = await fetchRobusta();
+    renderRC(rc);
+  } catch(e) {
+    document.getElementById("rc-price").textContent = "—";
+    document.getElementById("rc-sub").textContent = "Нет данных · " + e.message;
+    errors.push("RC");
+  }
+  setProgress(68);
+
+  // 4. Brent Oil
+  try {
+    const oil = await fetchYahoo('BZ=F');
+    renderOil(oil);
+  } catch(e) {
+    try {
+      const oil2 = await fetchYahoo('CL=F');
+      renderOil(oil2);
+    } catch(e2) {
+      document.getElementById('oil-price').textContent = '—';
+      document.getElementById('oil-sub').textContent = 'Нет данных';
+      errors.push('Oil');
+    }
+  }
+  setProgress(82);
+
+  // 5. Weather
+  try {
+    const weather = await fetchWeather();
+    renderWeather(weather);
+  } catch(e) {
+    document.getElementById('weather-grid').innerHTML = `<div style="grid-column:1/-1;" class="error-msg">Ошибка загрузки погоды: ${e.message}</div>`;
+    errors.push('Weather');
+  }
+  setProgress(100);
+
+  // Done
+  document.getElementById('updated-time').textContent = `Обновлено: ${now()}${errors.length ? ' · ⚠ Часть данных недоступна' : ''}`;
+  btn.disabled = false;
+  btn.textContent = '↻ Обновить данные';
+  setTimeout(() => setProgress(0), 1500);
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+document.getElementById('footer-date').textContent = new Date().toLocaleDateString('ru-RU', {month:'long', year:'numeric'});
+highlightCalendar();
+loadAll();
+
+// Auto-refresh every 10 minutes
+setInterval(loadAll, 10 * 60 * 1000);
+</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}</script></body>
+</html>
